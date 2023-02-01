@@ -1,0 +1,4 @@
+addr : "wss://chat-1.goodgame.ru/chat2/"
+tokens : "chat_tokens.txt"
+connections : 1000
+sendmsg : false
