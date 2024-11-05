@@ -31,18 +31,32 @@ type sendMsgStruct struct {
 	Mobile     int    `json:"Mobile"`
 }
 
-func DialToWs(addr string, userid string, token string, sendmsg bool) {
+func DialToWs(addr string, userid string, token string, sendmsg bool, i int, done chan int64) {
+	defer func() {
+		//close(done)
+		if r := recover(); r != nil {
+			log.Println("Recovered. Error:\n", r)
+		}
+	}()
 	startTime := time.Now().UnixMilli()
 	//log.Println("Starting ")
 	c, _, err := websocket.DefaultDialer.Dial(addr, nil)
 	if err != nil {
-		log.Println("dial:", err)
+		//log.Println("dial:", err)
+		log.Println("ERROR IN CONNECTIONS APPEARD IN ", i, " RUNNER")
+
 	}
 
 	defer c.Close()
-	done := make(chan struct{})
+	//done := make(chan struct{})
 	func() {
-		defer close(done)
+		//defer close(done)
+		defer func() {
+			//close(done)
+			if r := recover(); r != nil {
+				log.Println("Recovered. Error:\n", r)
+			}
+		}()
 		for {
 			_, message, err := c.ReadMessage()
 			if err != nil {
@@ -50,7 +64,7 @@ func DialToWs(addr string, userid string, token string, sendmsg bool) {
 				return
 			}
 			//log.Printf("recv: %s", message)
-			hanndleMsg(message, c, userid, token, startTime, sendmsg)
+			hanndleMsg(message, c, userid, token, startTime, sendmsg, done)
 
 		}
 	}()
@@ -58,7 +72,7 @@ func DialToWs(addr string, userid string, token string, sendmsg bool) {
 	//ticker := time.NewTicker(time.Second)
 	//defer ticker.Stop()
 }
-func hanndleMsg(msg []byte, c *websocket.Conn, id string, token string, start int64, sendmessage bool) {
+func hanndleMsg(msg []byte, c *websocket.Conn, id string, token string, start int64, sendmessage bool, done chan int64) {
 	var parsedMsg msgStruct
 	var FinishTime int64
 	//log.Println(string(msg))
@@ -88,7 +102,8 @@ func hanndleMsg(msg []byte, c *websocket.Conn, id string, token string, start in
 		c.WriteMessage(websocket.TextMessage, jsonJoin)
 		if !sendmessage {
 			FinishTime = (time.Now().UnixMilli() - start)
-			log.Println("Finished in ", FinishTime, " ms")
+			done <- FinishTime
+			log.Println("Auth Finished in ", FinishTime, " ms")
 		}
 	case "success_join":
 		if sendmessage {
@@ -102,7 +117,8 @@ func hanndleMsg(msg []byte, c *websocket.Conn, id string, token string, start in
 			//log.Println(string(jsonSend))
 			c.WriteMessage(websocket.TextMessage, jsonSend)
 			FinishTime = (time.Now().UnixMilli() - start)
-			log.Println("Finished in ", FinishTime, " ms")
+			done <- FinishTime
+			log.Println("Join Finished in ", FinishTime, " ms")
 		}
 	case "error":
 		log.Println(string(msg))
